@@ -128,7 +128,7 @@ in `graphics.py`.
 
 ## Acknowledgements
 
-- ### [DougTheDruid/SoT-ESP-Framework/](https://github.com/DougTheDruid/SoT-ESP-Framework)
+- ### [DougTheDruid/SoT-ESP-Framework](https://github.com/DougTheDruid/SoT-ESP-Framework)
     For being a great educational resource and demonstrating that there's
     nothing wrong with using Python for externals.
 

@@ -1,0 +1,70 @@
+import random
+import pyglet
+
+pyglet.options["debug_gl"] = False  # disable pyglet's debug mode
+# pylint: disable=wrong-import-position
+from common import config
+from game import GameHandler
+from graphics import Radar
+
+FPS = 30
+
+
+def refresh_radar(_):
+    game.update_objects()
+    yaw = game.local["view"][1]
+    radar.compass.rotate_compass(yaw + 90)
+    x, y, z = game.local["pos"]
+
+    coords.text = f"X: {x/100:.0f}\nY: {y/100:.0f}\nZ: {z/100:.0f}"
+
+
+if config["window_name"] == "":
+    # if the window name isn't set, generate a random one.
+    NAME_LEN = random.randint(6, 20)
+    CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ "
+    random_characters = random.choices(CHARACTERS, k=NAME_LEN)
+    WINDOW_NAME = "".join(random_characters)
+else:
+    WINDOW_NAME = config["window_name"]
+
+window = pyglet.window.Window(
+    config["window_size"],
+    config["window_size"],
+    caption=WINDOW_NAME,
+    style="default",  # can be "transparent" if you want
+)
+
+# move window to default position
+window.set_location(config["window_x"], config["window_y"])
+# FPS counter
+# fps = pyglet.window.FPSDisplay(window)
+# fps.label.font_size = 10
+
+radar = Radar()
+game = GameHandler()
+
+coords = pyglet.text.Label(
+    " ",
+    # font_name="Noto Sans",
+    font_size=10,
+    bold=False,
+    x=4,
+    y=config["window_size"] - 4,
+    anchor_x="left",
+    anchor_y="top",
+    multiline=True,
+    width=180,
+    batch=Radar.BATCH,
+)
+
+
+@window.event
+def on_draw():
+    window.clear()
+    Radar.BATCH.draw()
+    # fps.draw()
+
+
+pyglet.clock.schedule_interval(refresh_radar, 1 / FPS)
+pyglet.app.run(interval=1 / FPS)

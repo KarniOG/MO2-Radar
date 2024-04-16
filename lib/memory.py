@@ -1,7 +1,7 @@
 import struct
 import re
-import native
-from native import rpm
+from lib import native
+from lib.native import rpm
 
 
 class Reader:
@@ -42,6 +42,7 @@ class Reader:
         try:
             data = struct.unpack(structure, raw)
         except struct.error:
+            # dynamic typing gore, just raise an exception
             return None
 
         # struct.unpack() always returns a tuple, I don't like that.
@@ -49,28 +50,27 @@ class Reader:
             return data[0]
         return data
 
-    def read_string(self, address: int, length: int):
-        """read UTF-8 string"""
-        length = min(length, 255)
-        buf = rpm(self.pid, address, length)
+    def read_string(self, address: int, byte_len: int, encoding="utf-8"):
+        """read string from memory. length argument is the length of
+        the string in bytes, not character count."""
+        byte_len = min(byte_len, 255)
+        buf = rpm(self.pid, address, byte_len)
+        # if encoding == "utf-16":
+        #   i = buf.find(b"\x00\x00")
+        #   if i % 2 == 1:
+        #       i += 1  # deal with utf-16 chars that end with 0x00
+        #   return buf[:i].decode("utf-16")
+
         # i = buf.find(b"\x00")
         # if i != -1:
         #    return buf[:i].decode()
-        return buf.decode()
-
-    def read_utf16(self, address, length):
-        """read UTF-16 string"""
-        length = min(length, 255)
-        buf = rpm(self.pid, address, length)
-        # i = buf.find(b"\x00\x00")
-        # if i % 2 == 1:
-        #    i += 1  # deal with utf-16 chars that end with 0x00
-        # return buf[:i].decode("utf-16")
-        return buf.decode("utf-16")
+        return buf.decode(encoding)
 
 
 class PatternScanner:
     """Instruction pattern scanning utility"""
+
+    __slots__ = "exe_start", "exe_mem"
 
     def __init__(self, process_name: str, exe_file: str):
         pid = native.pidof(process_name)

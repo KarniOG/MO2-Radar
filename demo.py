@@ -1,13 +1,15 @@
+"""Quick demo I made for showcasing the radar's graphics"""
+
+# pylint: skip-file
 import random
 import math
 import pyglet
 
 pyglet.options["debug_gl"] = False  # disable pyglet's debug mode
-# pylint: disable=wrong-import-position
-from graphics import Radar, PlayerBlip, NPCBlip, GenericBlip
-from common import config
+from lib.graphics import Radar, PlayerBlip, NPCBlip, GenericBlip, make_view_matrix
+from lib.common import config
 
-FPS = 30
+FPS = 60
 YAW = 360
 dummies = []
 
@@ -15,8 +17,26 @@ window = pyglet.window.Window(
     config["window_size"],
     config["window_size"],
     caption="Demo",
-    style="default",  # can be "transparent" if you want
+    style="default",
 )
+fps = pyglet.window.FPSDisplay(window)
+fps.label.font_size = 10
+
+coords = pyglet.text.Label(
+    " ",
+    font_name="DejaVu Sans",
+    font_size=10,
+    x=4,
+    y=config["window_size"] - 4,
+    anchor_x="left",
+    anchor_y="top",
+    multiline=True,
+    width=180,
+    batch=Radar.BATCH,
+)
+coords.text = f"X: {random.randint(-10000, 10000)}\n\
+Y: {random.randint(-10000, 10000)}\n\
+Z: {random.randint(-10000, 10000)}"
 
 radar = Radar()
 
@@ -25,21 +45,20 @@ radar = Radar()
 def on_draw():
     window.clear()
     Radar.BATCH.draw()
+    fps.draw()
 
 
 class DummyActor:
+
     def __init__(self, fname, name, pos, health, is_ghost):
-        self.set_state(fname, name, pos, health, is_ghost)
-
-    def update_actor_state(self):
-        return
-
-    def set_state(self, fname, name, pos, health, is_ghost):
         self.fname = fname
         self.name = name
         self.pos = pos
         self.health = health
         self.is_ghost = is_ghost
+
+    def update_actor_state(self):
+        return
 
 
 def randpos(
@@ -90,13 +109,14 @@ for actor_type in ("Player", "NPC", "Object"):
 
 def refresh_radar(_):
     global YAW
-    YAW -= 1
-    radar.compass.rotate_compass(YAW)
+    YAW -= 0.2
+    view_matrix = make_view_matrix((0, 0, 0), (0, YAW, 0))
+    radar.compass.rotate_compass(view_matrix)
     for dummy in dummies:
-        dummy.actor.health[0] -= 1
+        dummy.actor.health[0] -= 0.2
         if dummy.actor.health[0] < 0:
             dummy.actor.health[0] = dummy.actor.health[1]
-        dummy.update((0, 0, 0), YAW)
+        dummy.update((0, 0, 0), view_matrix)
 
 
 pyglet.clock.schedule_interval(refresh_radar, 1 / FPS)

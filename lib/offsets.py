@@ -1,4 +1,4 @@
-from memory import PatternScanner
+from lib.memory import PatternScanner
 
 # pylint: disable=invalid-name
 
@@ -25,9 +25,6 @@ RootPos = 0xF0
 
 IsGhost = 0x688
 CreatureName = 0xCA0
-GuildName = 0xCD0  # doesn't load until you target them. useless.
 Health = 0xCE0
-Height = 0xDB8
 
-# StaticMesh actors have a different name offset
 MeshName = 0x2F0

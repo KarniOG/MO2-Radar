@@ -1,47 +1,83 @@
 import math
 import pyglet
 from pyglet import shapes
+from pyglet.graphics import Group
 from pyglet.text.layout import TextLayout
-from common import config
+from lib.common import config
 
-# from actors import Actor, NPC, Player
+
+# controls the order in which objects are drawn
+# without this, the depth of actor markers will be based on
+# when they were created, which can hide important information.
+lowest = Group(0)
+verylow = Group(1)
+low = Group(2)
+normal = Group(3)
+high = Group(4)
+veryhigh = Group(5)
+highest = Group(6)
+
+
+def make_view_matrix(
+    cam_pos: tuple[float, ...], cam_rotation: tuple[float, ...]
+) -> tuple[tuple[float, ...], ...]:
+    """return view matrix for an orthographic "plan" camera"""
+    # if you want to make an ESP, it's much easier
+    # to understand by starting with two dimensions
+    radyaw = math.radians(cam_rotation[1])
+    sinyaw = math.sin(radyaw)
+    cosyaw = math.cos(radyaw)
+    # swap camera x and y so we can use the same view matrix
+    # for rotating the compass and game objects
+    y, x = cam_pos[0:2]
+    # store our rotated position which will be subtracted
+    # from object positions later
+    vx = x * cosyaw - y * sinyaw
+    vy = x * sinyaw + y * cosyaw
+    return (
+        # x axis
+        (cosyaw, -sinyaw, -vx),
+        # y axis
+        (sinyaw, cosyaw, -vy),
+        # w or scale
+        # this would be the cross products but it's orthogonal I guess
+        (0, 0, Radar.RANGE / Radar.RADIUS),
+    )
 
 
 class RadarObject:
-    """generic radar object with methods for transformations and elevation-based alpha"""
+    """
+    generic radar object with methods for
+    transformations and elevation-based alpha
+    """
 
-    def rotate(self, x: float, y: float, degyaw: float) -> tuple[float, float]:
-        """Apply a 2D rotation transformation and return new points."""
-        # passing a rotation matrix from the gamehandler instead of a yaw
-        # could avoid these repeated conversions.
-        radyaw = math.radians(degyaw)
-        sinyaw = math.sin(radyaw)
-        cosyaw = math.cos(radyaw)
-
-        newx = x * cosyaw - y * sinyaw
-        newy = x * sinyaw + y * cosyaw
-        return newx, newy
-
-    def world_to_screen(self, your_pos: tuple, obj_pos: tuple, degyaw: float) -> tuple:
+    def world_to_screen(
+        self,
+        obj_pos: tuple[float, ...],
+        view_matrix: tuple[tuple[float, ...], ...],
+        _round=False,
+    ) -> tuple[float, float]:
         """
-        return screen coordinates by applying projection + rotation
-        transformations to given world positions.
+        apply orthographic projection transformation
+        to coordinates and return screen position
         """
-        # it would probably be good to add a "round" argument to this
 
-        # get delta
-        dx, dy = (
-            obj_pos[0] - your_pos[0],
-            your_pos[1] - obj_pos[1],  # UE coordinate system
-        )
+        # swap axes so we can use the "correct" rotation matrix
+        obj_y, obj_x = obj_pos[0:2]
 
-        # top-down projection transformation
-        px = Radar.RADIUS * (dx / Radar.SCALE)
-        py = Radar.RADIUS * (dy / Radar.SCALE)
+        # rotate + subtract camera position
+        x = obj_x * view_matrix[0][0] + obj_y * view_matrix[0][1] + view_matrix[0][2]
+        y = obj_x * view_matrix[1][0] + obj_y * view_matrix[1][1] + view_matrix[1][2]
+        # w = x * view[2][0] + y * view[2][1] + view[2][2]
+        # norm = 1 / w
+        norm = 1 / view_matrix[2][2]
+        # scale to radar size and place on radar
+        screen_x = Radar.CENTER[0] + x * norm
+        screen_y = Radar.CENTER[1] + y * norm
 
-        # rotation transformation
-        rx, ry = self.rotate(px, py, degyaw)
-        return Radar.CENTER[0] + rx, Radar.CENTER[1] + ry
+        if _round:
+            return round(screen_x), round(screen_y)
+        return screen_x, screen_y
 
     def get_alpha(self, elevation: float) -> int:
         """
@@ -56,11 +92,9 @@ class RadarObject:
         raw_alpha = 255 - (
             (abs(elevation) - threshold) * ((255 - min_alpha) / (ceiling - threshold))
         )
-        # I thought this would improve label performance
-        # but it doesn't matter much.
-        # inc = 17
-        # alpha = round(raw_alpha / inc) * inc
-        alpha = round(raw_alpha)
+        # round to nearest multiple of 5 to slightly reduce label updates
+        inc = 5
+        alpha = round(raw_alpha / inc) * inc
         # clamp values
         return min(255, max(min_alpha, alpha))
 
@@ -70,7 +104,7 @@ class GameObject(RadarObject):
 
     __slots__ = "label", "actor"
 
-    def __init__(self, actor):
+    def __init__(self, actor, group: Group):
         super().__init__()
         self.actor = actor
 
@@ -79,13 +113,13 @@ class GameObject(RadarObject):
             0,
             1,
             attributes={
-                # "font_name": "Noto Sans",
+                "font_name": "DejaVu Sans",
                 "color": (255, 255, 255, 255),
                 "align": "center",
             },
         )
 
-        self.label = TextLayout(doc, batch=Radar.BATCH)
+        self.label = TextLayout(doc, batch=Radar.BATCH, group=group)
         # we don't know how wide the label will be
         # so let's just make it big.
         self.label.width = 240
@@ -105,7 +139,7 @@ class GameObject(RadarObject):
             return
 
         if alpha_changed:
-            # it's actually faster to do this outside the label update
+            # it's actually faster to do this outside the label update?
             self.label.document.set_style(
                 0,
                 len(self.label.document.text),
@@ -137,23 +171,26 @@ class GameObject(RadarObject):
     def elevation_string(self, elevation: float) -> str:
         """return a string that indicates elevation difference"""
         if abs(elevation) < 450:
-            # you don't really need to know if something is 2m above or below you.
+            # hide elevation if target is at the same level as you
+            # return "\n "  # uncomment this to increase label FPS. probably.
             return ""
-        if elevation >= 0:
-            return f"\n▴ {round(elevation/100)}m"
-        return f"\n▾ {round(abs(elevation)/100)}m"
+        if elevation < 0:
+            return f"\n▾ {round(abs(elevation)/100)}m"
+        return f"\n▴ {round(elevation/100)}m"
 
 
 class Radar(RadarObject):
     BATCH = pyglet.graphics.Batch()
     RADIUS = config["window_size"] / 2
     CENTER = (RADIUS, RADIUS)
-    SCALE = config["max_range"]
+    RANGE = config["max_range"]
 
     __slots__ = "compass", "rings", "static"
 
     def __init__(self):
         super().__init__()
+        # these don't need a group since the radar should be created before
+        # any actors are loaded and the components are added in the right order.
         bg = shapes.Circle(
             x=Radar.CENTER[0],
             y=Radar.CENTER[1],
@@ -198,7 +235,7 @@ class Radar(RadarObject):
             ring = shapes.Arc(
                 x=Radar.CENTER[0],
                 y=Radar.CENTER[1],
-                radius=Radar.RADIUS * (r / Radar.SCALE),
+                radius=Radar.RADIUS * (r / Radar.RANGE),
                 color=(170, 170, 170, 85),
                 batch=Radar.BATCH,
             )
@@ -215,31 +252,38 @@ class Compass(RadarObject):
         self.north = shapes.Triangle(
             x=Radar.CENTER[0],
             y=Radar.CENTER[1],
-            x2=Radar.CENTER[0] - 8,
-            y2=Radar.CENTER[1] - 16,
-            x3=Radar.CENTER[0] + 8,
-            y3=Radar.CENTER[1] - 16,
+            x2=Radar.CENTER[0] + 16,
+            y2=Radar.CENTER[1] + 8,
+            x3=Radar.CENTER[0] + 16,
+            y3=Radar.CENTER[1] - 8,
             color=(170, 0, 0, 255),
             batch=Radar.BATCH,
         )
         # make it rotate around the center
-        self.north.anchor_position = (0, -Radar.CENTER[1])
+        self.north.anchor_position = (Radar.CENTER[1], 0)
 
-    def rotate_compass(self, yaw):
+    def rotate_compass(self, view_matrix):
         """transform compass lines to follow camera yaw"""
-        self.north.rotation = -yaw
+        # calculate original yaw so we can directly set
+        # the rotation of the north marker
+        yaw = math.atan2(view_matrix[1][0], view_matrix[1][1])
+        self.north.rotation = math.degrees(-yaw)
         for d in self.directions:
-            newx, newy = self.rotate(d["x"], d["y"], yaw)
-            newx2, newy2 = self.rotate(d["x2"], d["y2"], yaw)
+            # use view matrix to apply a rotation transformation
+            # to each compass line
+            new_x = d["x"] * view_matrix[0][0] + d["y"] * view_matrix[0][1]
+            new_y = d["x"] * view_matrix[1][0] + d["y"] * view_matrix[1][1]
 
-            d["line"].x = Radar.CENTER[0] + newx
-            d["line"].y = Radar.CENTER[1] + newy
-            d["line"].x2 = Radar.CENTER[0] + newx2
-            d["line"].y2 = Radar.CENTER[1] + newy2
+            new_x2 = d["x2"] * view_matrix[0][0] + d["y2"] * view_matrix[0][1]
+            new_y2 = d["x2"] * view_matrix[1][0] + d["y2"] * view_matrix[1][1]
+
+            d["line"].x = Radar.CENTER[0] + new_x
+            d["line"].y = Radar.CENTER[1] + new_y
+            d["line"].x2 = Radar.CENTER[0] + new_x2
+            d["line"].y2 = Radar.CENTER[1] + new_y2
 
     def build_compass(self):
         """generate lines indicating cardinal + ordinal directions"""
-
         # ordinal line length
         ordinal = Radar.RADIUS * math.sin(math.pi / 4)
         self.directions = (
@@ -304,12 +348,13 @@ class PlayerBlip(GameObject):
     """player icon that shows health as a circle"""
 
     RADIUS = 5
+    # name, elevation
     FONT_SIZES = (10, 7)
 
     __slots__ = "hp", "damage"
 
     def __init__(self, actor):
-        super().__init__(actor)
+        super().__init__(actor, highest)
         self.hp = shapes.Sector(
             x=0,
             y=0,
@@ -317,6 +362,7 @@ class PlayerBlip(GameObject):
             start_angle=math.pi / 2,
             color=(0, 170, 0, 255),
             batch=Radar.BATCH,
+            group=low,
         )
         self.damage = shapes.Sector(
             x=0,
@@ -326,6 +372,7 @@ class PlayerBlip(GameObject):
             start_angle=math.pi / 2,
             color=(170, 0, 0, 255),
             batch=Radar.BATCH,
+            group=low,
         )
 
     def delete(self):
@@ -333,13 +380,11 @@ class PlayerBlip(GameObject):
         self.damage.delete()
         self.label.delete()
 
-    def update(self, your_pos: tuple[float, float, float], degyaw: float):
+    def update(self, your_pos: tuple[float, float, float], view_matrix):
         # get the latest actor info
         self.actor.update_actor_state()
 
-        screen_x, screen_y = self.world_to_screen(your_pos, self.actor.pos, degyaw)
-        screen_x = round(screen_x)
-        screen_y = round(screen_y)
+        screen_x, screen_y = self.world_to_screen(self.actor.pos, view_matrix)
         self.hp.x = screen_x
         self.hp.y = screen_y
         self.damage.x = screen_x
@@ -351,6 +396,7 @@ class PlayerBlip(GameObject):
 
         alpha = self.get_alpha(elevation)
         if self.actor.is_ghost:
+            # make ghosts black
             self.hp.color = (0, 0, 0, alpha)
             self.damage.color = (0, 0, 0, alpha)
         else:
@@ -377,13 +423,14 @@ class PlayerBlip(GameObject):
 class NPCBlip(GameObject):
     """a diamond marker for NPCs that can optionally show health"""
 
-    MARKER_SIZE = 4
+    MARKER_SIZE = 5
+    # name, health/elevation
     FONT_SIZES = (8, 7, 7)
 
     __slots__ = "marker", "show_health", "y_offset"
 
     def __init__(self, actor):
-        super().__init__(actor)
+        super().__init__(actor, veryhigh)
         self.show_health = any(npc in actor.fname for npc in config["show_health"])
         self.y_offset = 10
 
@@ -392,6 +439,9 @@ class NPCBlip(GameObject):
             self.label.anchor_y = "top"
 
         # a yellow diamond
+        # this is in the veryhigh group because I want it to be
+        # visible above player markers so it's easy to tell if
+        # they're riding a mount or not.
         self.marker = shapes.Rectangle(
             x=0,
             y=0,
@@ -399,8 +449,10 @@ class NPCBlip(GameObject):
             height=NPCBlip.MARKER_SIZE,
             color=(255, 255, 85, 255),
             batch=Radar.BATCH,
+            group=normal,
         )
 
+        # rotate around the center of the marker, not the bottom left
         self.marker.anchor_position = (NPCBlip.MARKER_SIZE / 2, NPCBlip.MARKER_SIZE / 2)
         self.marker.rotation = 45
 
@@ -408,14 +460,14 @@ class NPCBlip(GameObject):
         self.marker.delete()
         self.label.delete()
 
-    def update(self, your_pos: tuple[float, float, float], degyaw: float):
+    def update(self, your_pos: tuple[float, float, float], view_matrix):
         self.actor.update_actor_state()
 
-        screen_x, screen_y = self.world_to_screen(your_pos, self.actor.pos, degyaw)
-        screen_x = round(screen_x)
-        screen_y = round(screen_y)
+        screen_x, screen_y = self.world_to_screen(self.actor.pos, view_matrix)
         self.marker.x = screen_x
         self.marker.y = screen_y
+        # self.marker.x = round(screen_x)
+        # self.marker.y = round(screen_y)
         self.label.x = screen_x
         self.label.y = screen_y + self.y_offset
 
@@ -423,6 +475,7 @@ class NPCBlip(GameObject):
         alpha = self.get_alpha(elevation)
         readable_elevation = self.elevation_string(elevation)
         if self.show_health:
+            # great for taming high level horses.
             hp, max_hp = self.actor.health
             new_label = (
                 f"{self.actor.name}\n({round(hp)}/{round(max_hp)}){readable_elevation}"
@@ -439,13 +492,14 @@ class GenericBlip(GameObject):
 
     OUTER_RADIUS = 4
     INNER_RADIUS = 1
+    # name, elevation
     FONT_SIZES = (8, 7)
 
     __slots__ = ("marker",)
 
     def __init__(self, actor):
-        super().__init__(actor)
-        # simple X shape.
+        super().__init__(actor, verylow)
+        # white X shape
         self.marker = shapes.Star(
             0,
             0,
@@ -455,20 +509,18 @@ class GenericBlip(GameObject):
             rotation=45,
             color=(255, 255, 255, 255),
             batch=Radar.BATCH,
+            group=lowest,
         )
 
     def delete(self):
         self.marker.delete()
         self.label.delete()
 
-    def update(self, your_pos: tuple[float, float, float], degyaw: float):
+    def update(self, your_pos: tuple[float, float, float], view_matrix):
         self.actor.update_actor_state()
-        screen_x, screen_y = self.world_to_screen(your_pos, self.actor.pos, degyaw)
-        # the X will look terrible if these aren't rounded.
-        screen_x = round(screen_x)
-        screen_y = round(screen_y)
-        self.marker.x = screen_x
-        self.marker.y = screen_y
+        screen_x, screen_y = self.world_to_screen(self.actor.pos, view_matrix)
+        self.marker.x = round(screen_x)
+        self.marker.y = round(screen_y)
         self.label.x = screen_x
         self.label.y = screen_y + 10
 

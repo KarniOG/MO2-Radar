@@ -2,8 +2,9 @@ import ctypes
 import os
 import psutil
 
+# check for privileges on import
 if os.getuid() != 0 or os.geteuid() != 0:
-    raise RuntimeError("This program requires root privileges! Use sudo.")
+    raise RuntimeError("This program requires root privileges!")
 
 
 class iovec(ctypes.Structure):  # pylint: disable=too-few-public-methods,invalid-name
@@ -35,6 +36,8 @@ def rpm(pid: int, address: int, size: int) -> bytes:
 
     nread = libc.process_vm_readv(pid, local_iov, 1, remote_iov, 1, 0)
     if nread != size:
+        # it might be better to raise an exception (NOT MemoryError)
+        # here since this usually leads to a TypeError anyway.
         return b""
     return buf.raw
 

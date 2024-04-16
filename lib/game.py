@@ -1,32 +1,27 @@
 import os
 import time
-from memory import Reader
-import offsets
-from common import config
-from actors import Actor, Player, NPC, Mesh
-from graphics import PlayerBlip, NPCBlip, GenericBlip
+from lib.memory import Reader
+from lib import offsets
+from lib.common import config
+from lib.actors import Actor, Player, NPC, Mesh
+from lib.graphics import PlayerBlip, NPCBlip, GenericBlip, make_view_matrix
 
 
 class GameHandler:
     """tracks game state information and actors of interest"""
 
-    __slots__ = "mem", "actor_cache", "fname_cache", "objects", "local", "uworld"
+    __slots__ = "mem", "actor_cache", "fname_cache", "objects", "local"
 
     def __init__(self):
         self.mem = Reader("GameThread")
-        self.uworld = self.mem.read(offsets.GWorld, "Q")
-        # use a set for the actor cache for fast membership testing
+        # use a set for fast membership testing
         self.actor_cache = frozenset()
         self.fname_cache = {}
         self.objects = []
-        self.local = {
-            "pawn": 0,
-            "pos": (0.0, 0.0, 0.0),
-            "view": (0.0, 0.0, 0.0, 0.0),
-        }
+        self.local = {}
 
     def update_local(self, uworld: int):
-        """Update local player position, view, and pawn address."""
+        """Update local player position, view matrix, and pawn address"""
         # UWorld->OwningGameInstance->*LocalPlayer->PlayerController
         game_instance = self.mem.read(uworld + offsets.OwningGameInstance, "Q")
         local_players = self.mem.read(game_instance + offsets.LocalPlayers, "Q")
@@ -35,10 +30,12 @@ class GameHandler:
 
         # PlayerController->PlayerCameraManager.CameraCachePrivate
         camera = self.mem.read(controller + offsets.PlayerCameraManager, "Q")
+        # x, y, z, pitch, yaw, roll, FOV
         raw_pov = self.mem.read(camera + offsets.CameraCachePrivate, "6df")
 
-        self.local["pos"] = raw_pov[0:3]  # x, y, z
-        self.local["view"] = raw_pov[3:]  # pitch, yaw, roll, FOV
+        self.local["pos"] = raw_pov[0:3]
+        view = raw_pov[3:7]
+        self.local["view_matrix"] = make_view_matrix(self.local["pos"], view)
 
         # PlayerController->AcknowledgedPawn
         # we compare this to player addresses to ignore ourself
@@ -91,11 +88,12 @@ class GameHandler:
         for addr in current_actors - self.actor_cache:
             if not addr:
                 continue
+            # I like bitmath but reading the key as two uint16s is simpler
             key = self.mem.read(addr + 0x18, "2H")
             fname = self.get_fname(key)
             new_actors.append((addr, fname))
 
-        # update cache with the most recent set of the actor array
+        # replace cache with the most recent actor array
         self.actor_cache = current_actors
         return new_actors
 
@@ -149,15 +147,13 @@ class GameHandler:
         for addr, fname in new_actors:
             self.init_actor(addr, fname)
 
-        # 0 yaw is east, north is -90. adding 90 makes this more intuitive.
-        yaw = self.local["view"][1] + 90
         # use a copy since we're modifying the original list
         for obj in self.objects.copy():
             is_loaded = obj.actor.addr in self.actor_cache
             is_local_player = obj.actor.addr == self.local["pawn"]
             if is_loaded and not is_local_player:
                 try:
-                    obj.update(self.local["pos"], yaw)
+                    obj.update(self.local["pos"], self.local["view_matrix"])
                     continue
                 except TypeError:
                     # the actor either just unloaded

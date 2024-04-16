@@ -1,5 +1,5 @@
-from memory import Reader
-import offsets
+from lib.memory import Reader
+from lib import offsets
 
 
 class Actor:
@@ -20,7 +20,7 @@ class Actor:
         # Actor->Name, Actor.NameLength
         name_addr, name_length = self.mem.read(name_ptr, "QB")
         name_bytes = max(0, name_length * 2 - 2)
-        name = self.mem.read_utf16(name_addr, name_bytes)
+        name = self.mem.read_string(name_addr, name_bytes, encoding="utf-16")
         return name
 
     def update_actor_state(self):

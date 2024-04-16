@@ -3,17 +3,16 @@ import pyglet
 
 pyglet.options["debug_gl"] = False  # disable pyglet's debug mode
 # pylint: disable=wrong-import-position
-from common import config
-from game import GameHandler
-from graphics import Radar
+from lib.common import config
+from lib.game import GameHandler
+from lib.graphics import Radar
 
 FPS = 30
 
 
 def refresh_radar(_):
     game.update_objects()
-    yaw = game.local["view"][1]
-    radar.compass.rotate_compass(yaw + 90)
+    radar.compass.rotate_compass(game.local["view_matrix"])
     x, y, z = game.local["pos"]
 
     coords.text = f"X: {x/100:.0f}\nY: {y/100:.0f}\nZ: {z/100:.0f}"
@@ -38,17 +37,16 @@ window = pyglet.window.Window(
 # move window to default position
 window.set_location(config["window_x"], config["window_y"])
 # FPS counter
-# fps = pyglet.window.FPSDisplay(window)
-# fps.label.font_size = 10
+fps = pyglet.window.FPSDisplay(window)
+fps.label.font_size = 10
 
 radar = Radar()
 game = GameHandler()
 
 coords = pyglet.text.Label(
     " ",
-    # font_name="Noto Sans",
+    font_name="DejaVu Sans",
     font_size=10,
-    bold=False,
     x=4,
     y=config["window_size"] - 4,
     anchor_x="left",
@@ -63,7 +61,7 @@ coords = pyglet.text.Label(
 def on_draw():
     window.clear()
     Radar.BATCH.draw()
-    # fps.draw()
+    fps.draw()
 
 
 pyglet.clock.schedule_interval(refresh_radar, 1 / FPS)

@@ -128,11 +128,11 @@ in `graphics.py`.
 
 ## Acknowledgements
 
-- ### [DougTheDruid/SoT-ESP-Framework](https://github.com/DougTheDruid/SoT-ESP-Framework)
+- ### [DougTheDruid/SoT-ESP-Framework](https://github.com/DougTheDruid/SoT-ESP-Framework/)
     For being a great educational resource and demonstrating that there's
     nothing wrong with using Python for externals.
 
-- ### [XRadius/project-tanya](https://github.com/XRadius/project-tanya)
+- ### [XRadius/project-tanya](https://github.com/XRadius/project-tanya/)
     For being an excellent Linux hack and providing detailed information
     on system settings.
 

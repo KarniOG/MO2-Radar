@@ -15,14 +15,13 @@
         "Molva",
         "Tagmaton",
         "izard",
+        "Dire",
         "Panther",
         "Troll",
         "Lynx",
-        "Belbus",
-        "olf",
         "Sator",
         "Taur",
-        "Risar_Commander",
+        "Commander",
         "Outlaw",
         "Walker",
         "Minotaur",
@@ -43,7 +42,12 @@
         "Boss",
         "TriggerSpawner",
         "Warlord",
-        "Spirit_C"
+        "Spirit_C",
+        "Sanctum",
+        "Warder",
+        "Sentinel",
+        "Overseer",
+        "Lykiator"
     ],
     "show_health": [
         "Horse",
@@ -58,14 +62,21 @@
         "Commander",
         "Cheiftain",
         "BanditBoss",
-        "Warlord"
+        "Warlord",
+        "Taur",
+        "Cougar",
+        "Queen",
+        "Overseer"
     ],
     "invert_label": [
         "Horse",
         "Molva",
         "Dire",
         "Terror",
-        "Bear"
+        "Bear",
+        "Taur",
+        "Cougar",
+        "Lykiator"
     ],
     "mesh": [
         "AvatarStaticMesh_LootBag",
@@ -75,7 +86,7 @@
         "BP_pickable",
         "SupplyTower"
     ],
-    "max_range": 22500,
+    "max_range": 20000,
     "window_name": "",
     "window_size": 720,
     "window_x": 0,

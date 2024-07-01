@@ -229,9 +229,11 @@ class Radar(RadarObject):
     def build_rings(self):
         """create radar rings that indicate specific ranges"""
         self.rings = []
-        # name range, load-in range
-        ranges = (4500, 15000)
+        # name range, load-in range, unload range
+        ranges = (4500, 15000, 20000)
         for r in ranges:
+            if r >= Radar.RANGE:
+                continue
             ring = shapes.Arc(
                 x=Radar.CENTER[0],
                 y=Radar.CENTER[1],

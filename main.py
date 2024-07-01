@@ -3,6 +3,8 @@ import pyglet
 
 pyglet.options["debug_gl"] = False  # disable pyglet's debug mode
 # pylint: disable=wrong-import-position
+from pyglet.window import key
+
 from lib.common import config
 from lib.game import GameHandler
 from lib.graphics import Radar
@@ -62,6 +64,17 @@ def on_draw():
     window.clear()
     Radar.BATCH.draw()
     fps.draw()
+
+@window.event
+def on_key_press(symbol, _modifiers):
+    # up arrow or pageup to zoom in, down arrow or pagedown to zoom out
+    match symbol:
+        case key.UP | key.PAGEUP:
+            Radar.RANGE = max(Radar.RANGE - 2000, 2000)
+            radar.build_rings()
+        case key.DOWN | key.PAGEDOWN:
+            Radar.RANGE = min(Radar.RANGE + 2000, 100000)
+            radar.build_rings()
 
 
 pyglet.clock.schedule_interval(refresh_radar, 1 / FPS)

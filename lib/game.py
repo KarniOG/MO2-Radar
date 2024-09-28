@@ -101,7 +101,7 @@ class GameHandler:
         """Parse an actor's fname and add a blip to self.objects if it matches"""
         # I don't like the way I designed the config file but I'm too lazy to change it.
 
-        if fname == "BP_PlayerCharacter_C" and addr != self.local["pawn"]:
+        if fname.startswith("BP_PlayerCharacter_") and addr != self.local["pawn"]:
             actor = Player(addr, fname, self.mem)
             blip = PlayerBlip(actor)
             self.objects.append(blip)

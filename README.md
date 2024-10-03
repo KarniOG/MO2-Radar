@@ -57,7 +57,7 @@ terminal in that directory and run:
 ```
 sh setup.sh
 ```
-to create automatically create a virtual environment for the cheat. On Debian
+to automatically create a virtual environment for the cheat. On Debian
 based distributions, you may need to install the `python3-venv` package first
 with:
 ```

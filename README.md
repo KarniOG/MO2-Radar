@@ -53,10 +53,20 @@ this hack. It works out of the box with no changes necessary.
 ## Setup
 
 Download the code and extract the files to a new directory, then open a
-terminal in that directory and install `pyglet` and `psutil` for the root user
-by running:
+terminal in that directory and run:
 ```
-sudo python3 -m pip install -r requirements.txt
+sh setup.sh
+```
+to create automatically create a virtual environment for the cheat. On Debian
+based distributions, you may need to install the `python3-venv` package first
+with:
+```
+sudo apt install python3-venv
+```
+
+Next, you can launch the cheat by running:
+```
+sudo sh launch.sh
 ```
 I recommend using the [Flatpak](https://flathub.org/apps/com.valvesoftware.Steam)
 version of Steam.

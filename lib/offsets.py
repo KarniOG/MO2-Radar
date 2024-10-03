@@ -11,20 +11,20 @@ GNames = scanner.pattern_scan(GNames_pat[0], GNames_pat[1]) + 8
 del scanner
 
 PersistentLevel = 0x30
-ActorArray = 0xA8
+ActorArray = 0xB0
 
-OwningGameInstance = 0x1B8
+OwningGameInstance = 0x1D8
 LocalPlayers = 0x38
 PlayerController = 0x30
-PlayerCameraManager = 0x350
-CameraCachePrivate = 0x1330
-AcknowledgedPawn = 0x340
+PlayerCameraManager = 0x348
+CameraCachePrivate = 0x13A0
+AcknowledgedPawn = 0x338
 
 RootComponent = 0x1A0
 RootPos = 0xF0
 
-IsGhost = 0x688
-CreatureName = 0xCA0
-Health = 0xCE0
+IsGhost = 0x678
+CreatureName = 0xC90
+Health = 0xCD0
 
-MeshName = 0x2F0
+MeshName = 0x2E8
